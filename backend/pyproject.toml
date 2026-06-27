@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "agentx"
+version = "0.1.0"
+description = "AgentX — Write → Sabotage → Fix debugging trainer"
+authors = ["Sourav P Bijoy", "Sneha Prasanth"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
+langchain = "^0.3.0"
+langchain-core = "^0.3.0"
+langchain-openai = "^0.3.0"
+langgraph = "^0.4.0"
+openai = "^1.80.0"
+docker = "^7.0.0"
+exa-py = "^1.5.0"
+pydantic = "^2.0.0"
+pydantic-settings = "^2.0.0"
+python-dotenv = "^1.0.0"
+websockets = "^15.0"
+httpx = "^0.28.0"
+reportlab = "^4.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-asyncio = "^0.25.0"
+httpx = "^0.28.0"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
