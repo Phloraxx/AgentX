@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   AgentX — design system
+   Calm. Considered. Crafted.
+   A code tool for working developers. Near-black canvas, mineral-teal
+   primary, copper accent. Three agent voices (Host / Saboteur /
+   Evaluator) carry distinct role colors used only where identity
+   carries information.
+   All color in OKLCH.
+   ───────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Surfaces — pure near-black, chroma 0 (no hidden warmth) */
+  --color-bg: oklch(0.135 0.000 0);
+  --color-surface: oklch(0.170 0.003 220);
+  --color-surface-2: oklch(0.205 0.004 220);
+  --color-hair: oklch(0.270 0.004 220); /* hairline borders */
+  --color-hair-strong: oklch(0.340 0.005 220);
+
+  /* Ink — body text. ≥7:1 vs bg. Faint cool bias toward the seed hue. */
+  --color-ink: oklch(0.935 0.004 220);
+  --color-ink-soft: oklch(0.720 0.006 220); /* ≥4.5:1 */
+  --color-muted: oklch(0.580 0.008 220);   /* ≥3.5:1 */
+  --color-faint: oklch(0.500 0.008 220);   /* chrome only — ≥3:1 large/UI */
+
+  /* Primary — mineral teal, lifted for dark canvas */
+  --color-primary: oklch(0.620 0.110 195);
+  --color-primary-strong: oklch(0.700 0.130 195);
+  --color-primary-soft: oklch(0.620 0.110 195 / 0.14);
+  --color-primary-line: oklch(0.620 0.110 195 / 0.32);
+
+  /* Accent — copper. Distinct hue + lifted lightness vs primary. */
+  --color-accent: oklch(0.760 0.130 70);
+
+  /* Agent voices — used only on role labels, dots, and trace tags */
+  --color-host: oklch(0.700 0.120 195);       /* mineral teal */
+  --color-saboteur: oklch(0.640 0.135 35);    /* rust */
+  --color-evaluator: oklch(0.720 0.110 158);  /* jade */
+  --color-student: oklch(0.760 0.090 250);    /* slate-blue (you) */
+  --color-system: oklch(0.740 0.110 85);      /* amber, for errors */
+
+  /* Semantic status */
+  --color-ok: oklch(0.720 0.110 158);
+  --color-warn: oklch(0.740 0.110 85);
+  --color-bad: oklch(0.640 0.135 35);
+
+  /* Fonts */
+  --font-sans: "Inter", "Inter var", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "JetBrains Mono", ui-monospace,
+    "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
+}
+
+/* ── Base ─────────────────────────────────────────────────── */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-hair);
+    /* Pin the focus ring color so `transition-colors` (which includes
+       outline-color) can't fade it in from currentColor on focus. */
+    outline-color: var(--color-primary);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-synthesis: none;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01", "ss03";
+    font-size: 14px;
+    line-height: 1.55;
+    letter-spacing: -0.006em;
+  }
+
+  ::selection {
+    background: var(--color-primary-soft);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Headings — fixed scale (product register, not fluid) */
+  h1, h2, h3, h4 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  /* Scrollbars — quiet, standard, not reinvented */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-hair-strong) transparent;
+  }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-hair-strong);
+    border-radius: 999px;
+    border: 3px solid var(--color-bg);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--color-faint);
+  }
+}
+
+/* ── Utilities ────────────────────────────────────────────── */
+
+@layer utilities {
+  .font-mono {
+    font-family: var(--font-mono);
+    font-feature-settings: "calt", "liga";
+  }
+
+  /* Tabular figures for scores, round numbers, timers */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Hairline divider that stays 1px on retina */
+  .hairline {
+    background: var(--color-hair);
+    height: 1px;
+    border: 0;
+  }
+
+  /* Quiet reveal — opacity/transform only, never layout */
+  .reveal {
+    animation: reveal var(--dur-slow) var(--ease-out) both;
+  }
+  @keyframes reveal {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* Reduced motion — crossfade, no transform */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+      scroll-behavior: auto !important;
+    }
+    .reveal { animation: none; opacity: 1; transform: none; }
+  }
+}
