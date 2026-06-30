@@ -1,0 +1,48 @@
+# AgentX — Dokploy Docker Compose
+# Deploy as a Docker Compose service in Dokploy.
+# Set environment variables in Dokploy UI (→ .env file → env_file injection).
+
+services:
+  sandbox-python:
+    build:
+      context: .
+      dockerfile: backend/sandbox-images/python/Dockerfile
+    image: agentx-sandbox-python:latest
+    entrypoint: ["echo", "sandbox image built"]
+
+  sandbox-node:
+    build:
+      context: .
+      dockerfile: backend/sandbox-images/javascript/Dockerfile
+    image: agentx-sandbox-node:latest
+    entrypoint: ["echo", "sandbox image built"]
+
+  agentx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentx
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - OPENCODE_API_KEY=${OPENCODE_API_KEY}
+      - EXA_API_KEY=${EXA_API_KEY}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - agentx-sessions:/app/data
+    depends_on:
+      - sandbox-python
+      - sandbox-node
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  agentx-sessions:
