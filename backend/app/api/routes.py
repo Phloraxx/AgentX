@@ -381,3 +381,4 @@ async def websocket_session(websocket: WebSocket, session_id: str):
         _session_queues.pop(session_id, None)
         set_emit_callback_for_session(session_id, None)
 
+
