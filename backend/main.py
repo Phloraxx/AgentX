@@ -13,6 +13,7 @@ import os
 from app.api.routes import router
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("app.tools").setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Path to frontend build output

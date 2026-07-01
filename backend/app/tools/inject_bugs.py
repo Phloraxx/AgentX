@@ -44,9 +44,11 @@ Respond with ONLY valid JSON (no markdown, no explanation)."""),
 
     try:
         response = llm.invoke(messages)
+        logger.debug(f"inject_bugs raw response: {response.content[:500]!r}")
         parsed = parse_json_response(response.content)
 
         if not parsed or "bugs" not in parsed:
+            logger.error(f"inject_bugs parse failed. Raw: {response.content[:300]!r}")
             return {"ok": False, "error": "Failed to parse bug injection response"}
 
         bugs = parsed["bugs"]

@@ -12,35 +12,41 @@ def parse_json_response(content: str) -> dict | None:
 
     Tries:
     1. Direct JSON parse
-    2. Extract from ```json ... ``` blocks
-    3. Find any { ... } object in the text
+    2. Strip ```json ... ``` fences then parse
+    3. Find outermost { } via brace-counting and parse that slice
     """
-    # Guard against None
     if not content:
         return None
-    # Try direct JSON parse
+
+    # 1. Direct parse
     try:
         return json.loads(content)
     except (json.JSONDecodeError, TypeError):
         pass
 
-    # Try to extract JSON from markdown code blocks
-    json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
-    if json_match:
-        try:
-            return json.loads(json_match.group(1))
-        except json.JSONDecodeError:
-            pass
+    # 2. Strip markdown fences
+    stripped = re.sub(r"^```(?:json)?\s*", "", content.strip(), flags=re.IGNORECASE)
+    stripped = re.sub(r"\s*```$", "", stripped.strip())
+    try:
+        return json.loads(stripped)
+    except (json.JSONDecodeError, TypeError):
+        pass
 
-    # Try to find any JSON object in the text.
-    # Non-greedy: match first balanced braces to avoid spanning multiple objects.
-    json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", content, re.DOTALL)
-    if json_match:
-        try:
-            return json.loads(json_match.group())
-        except json.JSONDecodeError:
-            pass
-
+    # 3. Find outermost { } by brace-counting (handles any nesting depth)
+    start = content.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    for i, ch in enumerate(content[start:], start):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(content[start : i + 1])
+                except json.JSONDecodeError:
+                    return None
     return None
 
 
