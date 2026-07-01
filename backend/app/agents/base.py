@@ -42,8 +42,8 @@ def make_llm(
         base_url=settings.opencode_base_url,
         temperature=temperature if temperature is not None else temp_map.get(model_key, 0.4),
         max_tokens=max_tokens if max_tokens is not None else tokens_map.get(model_key, 1500),
-        timeout=60,
-        max_retries=2,
+        timeout=120,
+        max_retries=1,
     )
     _llm_cache[cache_key] = llm
     return llm

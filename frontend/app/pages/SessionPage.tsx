@@ -38,6 +38,9 @@ function humanizeError(raw: string): string {
   if (/failed to fetch|networkerror|load failed/i.test(raw)) {
     return "Couldn't reach the server. Check your connection and retry.";
   }
+  if (/socket.*closed|connection.*reset|unexpected.*close/i.test(raw)) {
+    return "Connection dropped mid-request. Please retry.";
+  }
   return raw;
 }
 
