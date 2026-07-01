@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     host_temperature: float = 0.4
     host_max_tokens: int = 1500
     saboteur_temperature: float = 0.7
-    saboteur_max_tokens: int = 1200
+    saboteur_max_tokens: int = 2500
     evaluator_temperature: float = 0.2
     evaluator_max_tokens: int = 1500
 

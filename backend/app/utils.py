@@ -49,6 +49,29 @@ def parse_json_response(content: str) -> dict | None:
                     return None
     return None
 
+def extract_json_array(content: str, key: str) -> list | None:
+    """Extract a JSON array value for `key` from `content` using bracket-counting.
+    Handles truncated JSON where the outer object is incomplete.
+    """
+    import re as _re
+    pattern = f'"{key}"\\s*:\\s*\\['
+    m = _re.search(pattern, content)
+    if not m:
+        return None
+    start = m.end() - 1  # position of '['
+    depth = 0
+    for i, ch in enumerate(content[start:], start):
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(content[start : i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None
+
 
 def difficulty_to_num_bugs(difficulty: str) -> int:
     """Map difficulty to number of bugs to inject."""

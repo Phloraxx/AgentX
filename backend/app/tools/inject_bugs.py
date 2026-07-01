@@ -2,8 +2,7 @@
 
 import logging
 from langchain_core.tools import tool
-from app.utils import parse_json_response, difficulty_to_num_bugs, apply_bugs, validate_compiles
-
+from app.utils import parse_json_response, extract_json_array, difficulty_to_num_bugs, apply_bugs, validate_compiles
 logger = logging.getLogger(__name__)
 
 
@@ -45,10 +44,19 @@ Respond with ONLY valid JSON (no markdown, no explanation)."""),
     try:
         response = llm.invoke(messages)
         logger.debug(f"inject_bugs raw response: {response.content[:500]!r}")
-        parsed = parse_json_response(response.content)
+        raw = response.content
+        parsed = parse_json_response(raw)
+
+        # Truncation fallback: if full parse failed but "bugs" array is present,
+        # recover it with bracket-counting and drop test_cases.
+        if not parsed or "bugs" not in parsed:
+            recovered_bugs = extract_json_array(raw, "bugs")
+            if recovered_bugs:
+                parsed = {"bugs": recovered_bugs, "test_cases": []}
+                logger.warning("inject_bugs: recovered bugs from truncated response, test_cases dropped")
 
         if not parsed or "bugs" not in parsed:
-            logger.error(f"inject_bugs parse failed. Raw: {response.content[:300]!r}")
+            logger.error(f"inject_bugs parse failed. Raw: {raw[:300]!r}")
             return {"ok": False, "error": "Failed to parse bug injection response"}
 
         bugs = parsed["bugs"]
