@@ -101,3 +101,4 @@ function Detail({ label, value }: { label: string; value: unknown }) {
   );
 }
 
+
