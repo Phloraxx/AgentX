@@ -1,6 +1,6 @@
 /** SessionPage — the training surface: editor, trace, chat, score. */
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useSessionStore } from "../stores/session";
 import { useWebSocket, type WsStatus } from "../hooks/useWebSocket";
 import { createSession, submitFix as submitFixFn, submitOriginalCode } from "../lib/api";
@@ -65,6 +65,13 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
   const fixCode = useSessionStore((s) => s.fixCode);
   const originalCode = useSessionStore((s) => s.originalCode);
 
+  // Stable ref so startSession never needs config in its dep array
+  const configRef = useRef(config);
+  configRef.current = config;
+
+  // Guard: only start once per mount
+  const hasStartedRef = useRef(false);
+
   const handleWSMessage = useCallback(
     (msg: WSMessage) => {
       if (msg.type === "result") {
@@ -97,10 +104,11 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
     setLoading(true);
     setError(null);
     try {
+      const cfg = configRef.current;
       const req: CreateSessionRequest = {
-        language: config.language,
-        topic: config.topic,
-        difficulty: config.difficulty,
+        language: cfg.language,
+        topic: cfg.topic,
+        difficulty: cfg.difficulty,
         max_rounds: 3,
       };
       const res = await createSession(req);
@@ -125,13 +133,15 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [config, init, setLoading, setError]);
+  }, [init, setLoading, setError]);
 
   useEffect(() => {
-    if (sessionId === "new" || !currentSessionId) {
+    if ((sessionId === "new" || !currentSessionId) && !hasStartedRef.current) {
+      hasStartedRef.current = true;
       startSession();
     }
-  }, [sessionId, currentSessionId, startSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isLoadingPhase =
     loading ||
