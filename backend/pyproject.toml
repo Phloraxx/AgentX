@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "AgentX — Write → Sabotage → Fix debugging trainer"
 authors = ["Sourav P Bijoy", "Sneha Prasanth"]
 readme = "README.md"
+packages = [{include = "app"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
