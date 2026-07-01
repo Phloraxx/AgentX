@@ -63,7 +63,7 @@ def host_setup(state: SessionState) -> dict:
     from app.prompts import HOST_SYSTEM_PROMPT
     from app.tools.fetch_challenge import fetch_challenge
 
-    llm = make_llm("host", temperature=0.4)
+    llm = make_llm("host")
     topic = state.get("topic", "arrays")
     difficulty = state.get("difficulty", "easy")
     language = state.get("language", "python")

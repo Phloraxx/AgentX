@@ -33,7 +33,7 @@ def score_round_tool(
     from langchain_core.messages import SystemMessage, HumanMessage
     from app.utils import parse_json_response
 
-    llm = make_llm("evaluator", temperature=0.2)
+    llm = make_llm("evaluator")
 
     bugs_summary = "\n".join([
         f"- Line {b.get('line')}: {b.get('type')} — {b.get('description')}"

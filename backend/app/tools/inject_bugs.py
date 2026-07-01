@@ -23,7 +23,7 @@ def inject_bugs_tool(original_code: str, difficulty: str, language: str) -> dict
     from langchain_core.messages import SystemMessage, HumanMessage
     from app.sandbox.manager import get_sandbox
 
-    llm = make_llm("saboteur", temperature=0.7)
+    llm = make_llm("saboteur")
     num_bugs = difficulty_to_num_bugs(difficulty)
 
     messages = [
