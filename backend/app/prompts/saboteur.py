@@ -22,7 +22,8 @@ Rules:
 - The buggy code MUST still compile and run (no syntax errors)
 - Each bug should test a different concept
 - Write test cases that will FAIL on the buggy code but PASS on correct code
-- Output your analysis as a JSON object
+- test_cases MUST call the EXACT function name defined in the student's code — do NOT invent new function names
+- function_call must be a valid expression using the student's actual function (e.g. if the student wrote `def reverse_array(arr):`, use `reverse_array([1,2,3])`, not `two_sum(...)`)
 
 Output JSON format:
 {

@@ -54,8 +54,12 @@ def run_tests_tool(code: str, test_cases: list[dict], language: str) -> dict:
             runner = _build_js_runner(code, function_call)
 
         result = sandbox.run(runner, language)
-        stdout = result.get("stdout", "").strip()
-        stderr = result.get("stderr", "").strip()
+        # Sandbox may return stdout/stderr as non-string in edge cases;
+        # coerce to string before stripping.
+        raw_stdout = result.get("stdout", "")
+        raw_stderr = result.get("stderr", "")
+        stdout = (str(raw_stdout) if raw_stdout else "").strip()
+        stderr = (str(raw_stderr) if raw_stderr else "").strip()
         exit_code = result.get("exit_code", -1)
 
         # The runner prints json.dumps(result) of the function call
@@ -138,9 +142,6 @@ console.log(JSON.stringify(_result));
 """
 
 
-# ── Comparison ───────────────────────────────────────────────────────────────
-
-
 def _compare(actual: str, expected: str) -> bool:
     """Compare actual output to expected value.
 
@@ -151,20 +152,21 @@ def _compare(actual: str, expected: str) -> bool:
     if not actual:
         return False
 
-    actual_stripped = actual.strip()
-    expected_stripped = expected.strip()
+    # Coerce to string in case we receive a non-string type
+    actual_str = str(actual).strip()
+    expected_str = str(expected).strip()
 
-    # Try parsing both as JSON — this handles lists, numbers, booleans, and
+    # Try parsing both as JSON — handles lists, numbers, booleans, and
     # quoted strings (e.g. '"BANC"' → 'BANC') consistently on both sides.
     try:
-        a = json.loads(actual_stripped)
+        a = json.loads(actual_str)
     except (json.JSONDecodeError, TypeError):
-        a = actual_stripped
+        a = actual_str
 
     try:
-        e = json.loads(expected_stripped)
+        e = json.loads(expected_str)
     except (json.JSONDecodeError, TypeError):
-        e = expected_stripped
+        e = expected_str
 
     # Direct equality
     if a == e:
