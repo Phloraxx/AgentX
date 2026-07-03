@@ -21,12 +21,14 @@ class ExecResult(TypedDict):
 
 
 class RoundScore(TypedDict):
+    write_score: int       # 0-40: original code correctness
+    fix_score: int         # 0-60: debugging + fix quality
     bugs_fixed: int
     bugs_total: int
     code_quality: float  # 0-1
     correctness: float   # 0-1
     speed_bonus: float
-    total: int  # 0-100
+    total: int  # 0-100 (write_score + fix_score)
 
 
 class RoundRecord(TypedDict):
@@ -40,6 +42,8 @@ class RoundRecord(TypedDict):
     original_exec: ExecResult | None
     buggy_exec: ExecResult | None
     fix_exec: ExecResult | None
+    write_score: int          # 0-40: original code test pass rate
+    write_test_results: dict | None  # raw test results from write phase
     score: RoundScore | None
     difficulty_in: str  # easy | medium | hard
     difficulty_out: str

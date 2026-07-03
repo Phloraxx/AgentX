@@ -24,28 +24,28 @@ function ScoreCard({ score }: { score: RoundScore }) {
 
   const bars = [
     {
+      label: "Write phase",
+      points: score.write_score ?? 0,
+      max: 40,
+      css: "var(--color-host)",
+    },
+    {
+      label: "Fix phase",
+      points: score.fix_score ?? 0,
+      max: 60,
+      css: "var(--color-evaluator)",
+    },
+    {
       label: "Bugs fixed",
       points: Math.round((score.bugs_fixed / Math.max(score.bugs_total, 1)) * 40),
       max: 40,
       css: "var(--color-ok)",
     },
     {
-      label: "Code quality",
-      points: Math.round(score.code_quality * 30),
-      max: 30,
-      css: "var(--color-student)",
-    },
-    {
       label: "Correctness",
       points: Math.round((score.correctness ?? 0) * 20),
       max: 20,
-      css: "var(--color-evaluator)",
-    },
-    {
-      label: "Speed bonus",
-      points: Math.round(score.speed_bonus * 10),
-      max: 10,
-      css: "var(--color-accent)",
+      css: "var(--color-saboteur)",
     },
   ];
 

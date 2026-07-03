@@ -229,8 +229,56 @@ def saboteur_inject(state: SessionState) -> dict:
                                       {"ok": True, "skipped": True, "reason": "waiting_for_code"},
                                       session_id=session_id)],
         }
+    # ── Write validation: run hidden tests on original code BEFORE sabotage ──
+    test_cases = state.get("current_round", {}).get("test_cases", [])
+    write_score = 0
+    write_test_results = None
+    write_chat_msgs = []
+    write_trace = None
 
-    # Call the real inject_bugs tool
+    if test_cases and original_code:
+        try:
+            from app.tools.run_tests import run_tests_tool
+            write_test_results = run_tests_tool.invoke({
+                "code": original_code,
+                "test_cases": test_cases,
+                "language": language,
+            })
+            write_pass = write_test_results.get("pass_count", 0)
+            write_total = write_test_results.get("total", len(test_cases))
+            write_score = round((write_pass / max(write_total, 1)) * 40)
+
+            write_trace = _trace_and_emit(
+                "sabotage", "evaluator", "validate_original",
+                {"total": write_total},
+                {"ok": write_test_results.get("ok", False),
+                 "pass_count": write_pass, "fail_count": write_test_results.get("fail_count", 0)},
+                session_id=session_id,
+            )
+
+            # Show test results in chat
+            summary = f"🧪 Write phase: {write_pass}/{write_total} tests passed."
+            failures = [r for r in write_test_results.get("results", []) if not r.get("passed")]
+            if failures:
+                fail_lines = "\n".join(
+                    f"  ✗ {f.get('function_call', '?')} → got {f.get('actual', 'error')}, expected {f.get('expected', '?')}"
+                    for f in failures[:3]
+                )
+                summary += f"\n{fail_lines}"
+            if write_pass == write_total:
+                summary += "\nGreat work — all tests pass. Let's see how the Saboteur handles it."
+            write_chat_msgs.append({"role": "evaluator", "content": summary,
+                                    "ts": datetime.now(timezone.utc).isoformat()})
+
+        except Exception as we:
+            logger.warning(f"Write validation error: {we}")
+            write_trace = _trace_and_emit(
+                "sabotage", "evaluator", "validate_original", {},
+                {"ok": False, "error": str(we)},
+                session_id=session_id,
+            )
+
+    # ── Saboteur: inject bugs into the student's code ──
     from app.tools.inject_bugs import inject_bugs_tool
 
     try:
@@ -259,6 +307,7 @@ def saboteur_inject(state: SessionState) -> dict:
             # Host commentary: brief code review + acknowledge sabotage
             host_review = _host_code_review(original_code, language)
             chat_msgs = [
+                *write_chat_msgs,
                 {"role": "host",
                  "content": host_review,
                  "ts": datetime.now(timezone.utc).isoformat()},
@@ -270,6 +319,7 @@ def saboteur_inject(state: SessionState) -> dict:
                  "ts": datetime.now(timezone.utc).isoformat()},
             ]
 
+            traces = [t for t in [write_trace, trace] if t is not None]
             return {
                 "phase": "student_fixing",
                 "current_round": {
@@ -279,9 +329,11 @@ def saboteur_inject(state: SessionState) -> dict:
                     "test_cases": test_cases,
                     "original_exec": result.get("original_exec"),
                     "buggy_exec": result.get("buggy_exec"),
+                    "write_score": write_score,
+                    "write_test_results": write_test_results,
                 },
                 "chat": chat_msgs,
-                "trace": [trace],
+                "trace": traces,
             }
 
         # Tool returned error — surface failure
@@ -470,18 +522,33 @@ def evaluator_score(state: SessionState) -> dict:
         })
 
         if score_result.get("ok"):
-            score = score_result.get("score", {})
+            raw_score = score_result.get("score", {})
             feedback = score_result.get("feedback", "")
             remaining = score_result.get("remaining_bugs", [])
             new_issues = score_result.get("new_issues", [])
+
+            # ── Two-phase scoring: write_score (0-40) + fix_score (0-60) ──
+            write_score = current.get("write_score", 0) or 0
+            fix_score = round(raw_score.get("total", 0) * 0.6)
+            total = write_score + fix_score
+
+            score = {
+                "write_score": write_score,
+                "fix_score": fix_score,
+                "bugs_fixed": raw_score.get("bugs_fixed", 0),
+                "bugs_total": raw_score.get("bugs_total", len(bugs)),
+                "code_quality": raw_score.get("code_quality", 0.0),
+                "correctness": raw_score.get("correctness", 0.0),
+                "speed_bonus": raw_score.get("speed_bonus", 0.0),
+                "total": total,
+            }
 
             # Build test summary for chat
             test_summary = ""
             if test_result:
                 pass_count = test_result.get("pass_count", 0)
-                total = test_result.get("total", len(test_cases))
-                test_summary = f"\n\n🧪 Tests: {pass_count}/{total} passed"
-                # Surface failing test details
+                total_tests = test_result.get("total", len(test_cases))
+                test_summary = f"\n\n🧪 Fix tests: {pass_count}/{total_tests} passed"
                 failures = [r for r in test_result.get("results", []) if not r.get("passed")]
                 if failures:
                     fail_lines = "\n".join(
@@ -492,7 +559,12 @@ def evaluator_score(state: SessionState) -> dict:
 
             chat_msg = {
                 "role": "evaluator",
-                "content": f"📊 Score: {score.get('total', 0)}/100\n\n{feedback}{test_summary}",
+                "content": (
+                    f"📊 Round Score: {total}/100\n"
+                    f"  Write phase: {write_score}/40\n"
+                    f"  Fix phase: {fix_score}/60\n\n"
+                    f"{feedback}{test_summary}"
+                ),
                 "ts": datetime.now(timezone.utc).isoformat(),
             }
             if remaining:
@@ -521,6 +593,8 @@ def evaluator_score(state: SessionState) -> dict:
             "current_round": {
                 **current,
                 "score": {
+                    "write_score": current.get("write_score", 0) or 0,
+                    "fix_score": 0,
                     "bugs_fixed": 0, "bugs_total": len(bugs),
                     "code_quality": 0.0, "correctness": 0.0, "speed_bonus": 0.0, "total": 0,
                 },
@@ -541,6 +615,8 @@ def evaluator_score(state: SessionState) -> dict:
             "current_round": {
                 **current,
                 "score": {
+                    "write_score": current.get("write_score", 0) or 0,
+                    "fix_score": 0,
                     "bugs_fixed": 0, "bugs_total": len(bugs),
                     "code_quality": 0.0, "correctness": 0.0, "speed_bonus": 0.0, "total": 0,
                 },
@@ -549,7 +625,7 @@ def evaluator_score(state: SessionState) -> dict:
                       'content': 'Warning: Evaluator failed to score; round scored 0.',
                       'ts': datetime.now(timezone.utc).isoformat()}],
             "trace": traces + [_trace_and_emit("evaluating", "evaluator", "score_round",
-                                               {}, {"ok": False, "error": score_result.get("error", "unknown")},
+                                               {}, {"ok": False, "error": str(e)},
                                                session_id=session_id)],
         }
 
@@ -642,10 +718,13 @@ def _format_challenge(detail: dict, language: str) -> str:
         parts.append(f"\n### Starter Code\n```{language}\n{starter}\n```")
 
     if tests:
-        parts.append("\n### Test Cases")
-        for t in tests:
-            call = t.get("function_call", t.get("input", ""))
-            parts.append(f"- `{call}` → Expected: `{t.get('expected', '')}`")
+        # Show only the first test case as an example — the rest are
+        # hidden tests used for evaluation, not visible to the student.
+        first = tests[0]
+        call = first.get("function_call", first.get("input", ""))
+        parts.append(f"\n### Example\n- `{call}` → Expected: `{first.get('expected', '')}`")
+        if len(tests) > 1:
+            parts.append(f"_+{len(tests) - 1} hidden test case(s) will run during evaluation._")
 
     if constraints:
         parts.append(f"\n### Constraints\n{constraints}")

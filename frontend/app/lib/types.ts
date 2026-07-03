@@ -17,6 +17,8 @@ export interface ExecResult {
 }
 
 export interface RoundScore {
+  write_score: number;
+  fix_score: number;
   bugs_fixed: number;
   bugs_total: number;
   code_quality: number;
