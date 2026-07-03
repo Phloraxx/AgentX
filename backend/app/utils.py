@@ -98,27 +98,17 @@ def apply_bugs(code: str, bugs: list[dict]) -> tuple[str, int]:
             continue
 
         if 0 < line_num <= len(lines):
-            # Strategy 1: exact match at the specified line
+            # Strategy 1: exact match at the specified line number
             if original in lines[line_num - 1]:
                 lines[line_num - 1] = lines[line_num - 1].replace(original, sabotaged)
                 applied += 1
                 continue
             # Strategy 2: search all lines for the original string
-            found = False
             for i, line in enumerate(lines):
                 if original in line:
                     lines[i] = line.replace(original, sabotaged)
                     applied += 1
-                    found = True
                     break
-            if found:
-                continue
-            # Strategy 3: LLM hallucinated the original — replace the whole
-            # line at the specified line number with the sabotaged version
-            if sabotaged:
-                lines[line_num - 1] = sabotaged
-                applied += 1
-                continue
         elif original:
             # No valid line number — search by content
             for i, line in enumerate(lines):

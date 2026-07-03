@@ -103,14 +103,14 @@ class TestApplyBugs:
         assert "c = 0" in lines[2]
         assert applied == 2
 
-    def test_no_match_falls_back_to_line_replacement(self):
-        """When the original string isn't found, apply_bugs should fall back
-        to replacing the whole line at the specified line number."""
+    def test_no_match_is_noop(self):
+        """When the original string isn't found anywhere, apply_bugs should
+        not modify the code — the LLM hallucinated the original content."""
         code = "def foo():\n    pass"
         bugs = [{"line": 2, "original": "nonexistent", "sabotaged": "replaced"}]
         result, applied = apply_bugs(code, bugs)
-        assert applied == 1
-        assert "replaced" in result
+        assert result == code
+        assert applied == 0
 
     def test_out_of_range_line(self):
         code = "line1"

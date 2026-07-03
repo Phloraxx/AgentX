@@ -63,8 +63,36 @@ Respond with ONLY valid JSON (no markdown, no explanation)."""),
         test_cases = parsed.get("test_cases", [])
         buggy_code, applied = apply_bugs(original_code, bugs)
 
+        # If apply_bugs couldn't find the original strings, retry with a
+        # more explicit prompt that shows the exact lines to modify
         if applied < len(bugs):
-            return {"ok": False, "error": f"Only {applied}/{len(bugs)} bugs could be applied (line numbers out of range)"}
+            logger.warning(f"apply_bugs only applied {applied}/{len(bugs)}, retrying with explicit prompt")
+            lines_preview = "\n".join(
+                f"Line {i+1}: {line}" for i, line in enumerate(original_code.split("\n"))
+            )
+            retry_msgs = [
+                SystemMessage(content=SABOTEUR_SYSTEM_PROMPT),
+                HumanMessage(content=f"""\
+The previous attempt failed because the 'original' field didn't match the actual code.
+Here are the EXACT lines of the student's code with line numbers:
+
+{lines_preview}
+
+Inject {num_bugs} bug(s) by modifying EXISTING lines. The 'original' field MUST be
+copied EXACTLY from the code above (including whitespace). The 'line' field MUST
+match the actual line number shown above.
+
+Respond with ONLY valid JSON."""),
+            ]
+            retry_response = llm.invoke(retry_msgs)
+            retry_parsed = parse_json_response(retry_response.content)
+            if retry_parsed and "bugs" in retry_parsed:
+                bugs = retry_parsed["bugs"]
+                test_cases = retry_parsed.get("test_cases", test_cases)
+                buggy_code, applied = apply_bugs(original_code, bugs)
+
+        if applied < len(bugs):
+            return {"ok": False, "error": f"Only {applied}/{len(bugs)} bugs could be applied (LLM original strings not found in code)"}
 
         if not validate_compiles(buggy_code, language):
             return {"ok": False, "error": "Buggy code does not compile"}
