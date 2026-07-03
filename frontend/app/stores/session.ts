@@ -98,7 +98,15 @@ export const useSessionStore = create<SessionStore>((set) => ({
     set((s) => ({ chat: [...s.chat, msg] })),
 
   addTraceEvent: (evt) =>
-    set((s) => ({ trace: [...s.trace, evt] })),
+    set((s) => {
+      // Dedup by timestamp+tool — REST response and WS may both deliver the
+      // same event; skip if we already have one with the same ts.
+      const key = `${evt.ts}:${evt.tool ?? ""}`;
+      if (s.trace.some((t) => `${t.ts}:${t.tool ?? ""}` === key)) {
+        return {};
+      }
+      return { trace: [...s.trace, evt] };
+    }),
 
   setPhase: (phase) => set({ phase }),
 

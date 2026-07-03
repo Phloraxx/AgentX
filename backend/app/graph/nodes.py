@@ -120,6 +120,7 @@ Return the challenge details including title, description, starter code, and tes
                                         session_id=session_id)
             else:
                 # Tool returned error — fallback
+                challenge_detail = {}
                 challenge_title = f"{topic}:{difficulty}"
                 challenge_text = f"Solve a {difficulty} {topic} problem."
                 starter_code = ""
@@ -133,10 +134,10 @@ Return the challenge details including title, description, starter code, and tes
             # 4d: Model didn't call the tool — use real fallback
             from app.tools.fetch_challenge import _fallback_challenge
             fb = _fallback_challenge(topic, difficulty, language)
-            detail = fb.get("challenge_detail", {})
-            challenge_text = _format_challenge(detail, language) if detail else f"Solve a {difficulty} {topic} problem."
-            starter_code = detail.get("starter_code", {}).get(language, "") if detail else ""
-            challenge_title = detail.get("title", f"{topic}:{difficulty}") if detail else f"{topic}:{difficulty}"
+            challenge_detail = fb.get("challenge_detail", {})
+            challenge_text = _format_challenge(challenge_detail, language) if challenge_detail else f"Solve a {difficulty} {topic} problem."
+            starter_code = challenge_detail.get("starter_code", {}).get(language, "") if challenge_detail else ""
+            challenge_title = challenge_detail.get("title", f"{topic}:{difficulty}") if challenge_detail else f"{topic}:{difficulty}"
             fallback_chat = [{'role': 'system',
                               'content': 'Warning: Host could not fetch a challenge via tools; using a fallback problem.',
                               'ts': datetime.now(timezone.utc).isoformat()}]
@@ -149,24 +150,27 @@ Return the challenge details including title, description, starter code, and tes
         # Fallback to hardcoded challenge
         from app.tools.fetch_challenge import _fallback_challenge
         fb = _fallback_challenge(topic, difficulty, language)
-        detail = fb.get("challenge_detail", {})
-        challenge_text = _format_challenge(detail, language) if detail else f"Solve a {difficulty} {topic} problem."
-        starter_code = detail.get("starter_code", {}).get(language, "") if detail else ""
-        challenge_title = detail.get("title", f"{topic}:{difficulty}") if detail else f"{topic}:{difficulty}"
+        challenge_detail = fb.get("challenge_detail", {})
+        challenge_text = _format_challenge(challenge_detail, language) if challenge_detail else f"Solve a {difficulty} {topic} problem."
+        starter_code = challenge_detail.get("starter_code", {}).get(language, "") if challenge_detail else ""
+        challenge_title = challenge_detail.get("title", f"{topic}:{difficulty}") if challenge_detail else f"{topic}:{difficulty}"
         trace = _trace_and_emit("setup", "host", "fetch_challenge",
                                 {}, {"ok": True, "source": "error_fallback"},
                                 session_id=session_id)
+
+    # Capture test_cases from the challenge for later scoring
+    challenge_test_cases = challenge_detail.get("test_cases", []) if challenge_detail else []
 
     return {
         "phase": "host_present",
         "current_round": {
             "round_num": state["round_num"],
             "challenge": challenge_text,
-            "original_code": "",
+            "original_code": starter_code,
             "buggy_code": "",
             "fix_code": "",
             "bug_manifest": [],
-            "test_cases": [],
+            "test_cases": challenge_test_cases,
             "original_exec": None,
             "buggy_exec": None,
             "fix_exec": None,
@@ -238,7 +242,13 @@ def saboteur_inject(state: SessionState) -> dict:
 
         if result.get("ok"):
             bugs = result.get("bug_manifest", [])
-            test_cases = result.get("test_cases", [])
+            saboteur_tests = result.get("test_cases", [])
+
+            # Merge test cases: prefer the saboteur's (they target the bugs),
+            # but fall back to the challenge's original tests if the saboteur
+            # didn't generate any (truncation recovery drops them to []).
+            existing_tests = state.get("current_round", {}).get("test_cases", [])
+            test_cases = saboteur_tests if saboteur_tests else existing_tests
 
             trace = _trace_and_emit("sabotage", "saboteur", "inject_bugs",
                                     {"difficulty": difficulty, "language": language},
@@ -382,10 +392,11 @@ def host_run_fix(state: SessionState) -> dict:
 
 
 def evaluator_score(state: SessionState) -> dict:
-    """Evaluator diffs all three versions and scores the round.
+    """Evaluator runs tests, then scores the round.
 
-    Uses the score_round tool (real @tool) and optionally run_tests tool
-    to evaluate the student's fix.
+    Order matters: tests run FIRST so their pass/fail results feed into the
+    scoring prompt. The evaluator LLM sees both the code diff AND the actual
+    test outcomes, preventing the "100/100 with 0/2 tests" contradiction.
     """
     current = state.get("current_round", {})
     original_code = current.get("original_code", "")
@@ -397,10 +408,37 @@ def evaluator_score(state: SessionState) -> dict:
     language = state.get("language", "python")
     session_id = state.get("session_id", "")
 
+    # ── Stage 1: Run tests BEFORE scoring ──
+    test_result = None
+    test_trace = None
+    if test_cases and fix_code:
+        try:
+            from app.tools.run_tests import run_tests_tool
+            test_result = run_tests_tool.invoke({
+                "code": fix_code,
+                "test_cases": test_cases,
+                "language": language,
+            })
+            test_trace = _trace_and_emit(
+                "evaluating", "evaluator", "run_tests",
+                {"total": test_result.get("total", 0)},
+                {"ok": test_result.get("ok", False),
+                 "pass_count": test_result.get("pass_count", 0),
+                 "fail_count": test_result.get("fail_count", 0)},
+                session_id=session_id,
+            )
+        except Exception as te:
+            logger.warning(f"run_tests error: {te}")
+            test_trace = _trace_and_emit(
+                "evaluating", "evaluator", "run_tests", {},
+                {"ok": False, "error": str(te)},
+                session_id=session_id,
+            )
+
+    # ── Stage 2: Score with test results included ──
     from app.tools.score_round import score_round_tool
 
     try:
-        # Score the round using the real tool
         score_result = score_round_tool.invoke({
             "original_code": original_code,
             "buggy_code": buggy_code,
@@ -408,6 +446,7 @@ def evaluator_score(state: SessionState) -> dict:
             "bug_manifest": bugs,
             "fix_exec": fix_exec or {},
             "language": language,
+            "test_result": test_result,
         })
 
         if score_result.get("ok"):
@@ -416,23 +455,21 @@ def evaluator_score(state: SessionState) -> dict:
             remaining = score_result.get("remaining_bugs", [])
             new_issues = score_result.get("new_issues", [])
 
-            # Run test cases if available
+            # Build test summary for chat
             test_summary = ""
-            if test_cases and fix_code:
-                try:
-                    from app.tools.run_tests import run_tests_tool
-                    test_result = run_tests_tool.invoke({
-                        "code": fix_code,
-                        "test_cases": test_cases,
-                        "language": language,
-                    })
-                    pass_count = test_result.get("pass_count", 0)
-                    total = test_result.get("total", len(test_cases))
-                    test_summary = f"\n\n🧪 Tests: {pass_count}/{total} passed"
-                except Exception as te:
-                    logger.warning(f"run_tests error: {te}")
+            if test_result:
+                pass_count = test_result.get("pass_count", 0)
+                total = test_result.get("total", len(test_cases))
+                test_summary = f"\n\n🧪 Tests: {pass_count}/{total} passed"
+                # Surface failing test details
+                failures = [r for r in test_result.get("results", []) if not r.get("passed")]
+                if failures:
+                    fail_lines = "\n".join(
+                        f"  ✗ {f.get('function_call', '?')} → got {f.get('actual', 'error')}, expected {f.get('expected', '?')}"
+                        for f in failures[:3]
+                    )
+                    test_summary += f"\n{fail_lines}"
 
-            # Add feedback to chat
             chat_msg = {
                 "role": "evaluator",
                 "content": f"📊 Score: {score.get('total', 0)}/100\n\n{feedback}{test_summary}",
@@ -443,63 +480,57 @@ def evaluator_score(state: SessionState) -> dict:
             if new_issues:
                 chat_msg["content"] += f"\n\nNew issues: {', '.join(new_issues)}"
 
-            trace = _trace_and_emit("evaluating", "evaluator", "score_round",
-                                    {"bugs_total": len(bugs)},
-                                    {"ok": True, "score": score},
-                                    session_id=session_id)
+            score_trace = _trace_and_emit("evaluating", "evaluator", "score_round",
+                                          {"bugs_total": len(bugs), "tests_run": bool(test_result)},
+                                          {"ok": True, "score": score},
+                                          session_id=session_id)
 
+            traces = [t for t in [test_trace, score_trace] if t is not None]
             return {
                 "phase": "round_complete",
-                "current_round": {
-                    **current,
-                    "score": score,
-                },
+                "current_round": {**current, "score": score},
                 "chat": [chat_msg],
-                "trace": [trace],
+                "trace": traces,
             }
 
         # Tool returned error — use fallback scoring
         logger.warning(f"score_round_tool returned error: {score_result.get('error')}")
+        traces = [t for t in [test_trace] if t is not None]
         return {
             "phase": "round_complete",
             "current_round": {
                 **current,
                 "score": {
-                    "bugs_fixed": 0,
-                    "bugs_total": len(bugs),
-                    "code_quality": 0.0,
-                    "speed_bonus": 0.0,
-                    "total": 0,
+                    "bugs_fixed": 0, "bugs_total": len(bugs),
+                    "code_quality": 0.0, "speed_bonus": 0.0, "total": 0,
                 },
             },
             "chat": [{'role': 'system',
                       'content': 'Warning: Evaluator failed to score; round scored 0.',
                       'ts': datetime.now(timezone.utc).isoformat()}],
-            "trace": [_trace_and_emit("evaluating", "evaluator", "score_round",
-                                      {}, {"ok": False, "error": score_result.get("error", "unknown")},
-                                      session_id=session_id)],
+            "trace": traces + [_trace_and_emit("evaluating", "evaluator", "score_round",
+                                               {}, {"ok": False, "error": score_result.get("error", "unknown")},
+                                               session_id=session_id)],
         }
 
     except Exception as e:
         logger.error(f"evaluator_score error: {e}")
+        traces = [t for t in [test_trace] if t is not None]
         return {
             "phase": "round_complete",
             "current_round": {
                 **current,
                 "score": {
-                    "bugs_fixed": 0,
-                    "bugs_total": len(bugs),
-                    "code_quality": 0.0,
-                    "speed_bonus": 0.0,
-                    "total": 0,
+                    "bugs_fixed": 0, "bugs_total": len(bugs),
+                    "code_quality": 0.0, "speed_bonus": 0.0, "total": 0,
                 },
             },
             "chat": [{'role': 'system',
                       'content': 'Warning: Evaluator failed to score; round scored 0.',
                       'ts': datetime.now(timezone.utc).isoformat()}],
-            "trace": [_trace_and_emit("evaluating", "evaluator", "score_round",
-                                      {}, {"ok": False, "error": str(e)},
-                                      session_id=session_id)],
+            "trace": traces + [_trace_and_emit("evaluating", "evaluator", "score_round",
+                                               {}, {"ok": False, "error": str(e)},
+                                               session_id=session_id)],
         }
 
 
@@ -557,7 +588,8 @@ def _format_challenge(detail: dict, language: str) -> str:
     if tests:
         parts.append("\n### Test Cases")
         for t in tests:
-            parts.append(f"- Input: `{t.get('input', '')}` → Expected: `{t.get('expected', '')}`")
+            call = t.get("function_call", t.get("input", ""))
+            parts.append(f"- `{call}` → Expected: `{t.get('expected', '')}`")
 
     if constraints:
         parts.append(f"\n### Constraints\n{constraints}")

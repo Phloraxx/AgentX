@@ -36,8 +36,8 @@ Output JSON format:
     }
   ],
   "test_cases": [
-    {"input": "<test input>", "expected": "<correct output>", "description": "<what this tests>"}
+    {"function_call": "<expression calling the function, e.g. two_sum([2,7,11,15], 9)>", "expected": "<correct return value as JSON, e.g. [0,1]>", "description": "<what this tests>"}
   ],
   "analysis": "<brief analysis of the code's strengths and weaknesses>"
-}\
+}
 """

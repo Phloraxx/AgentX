@@ -35,7 +35,9 @@ class TestFallbackChallenge:
         result = _fallback_challenge("unknown_topic", "easy", "python")
         assert result["ok"] is True
         assert "Generic" in result["challenge_detail"]["title"]
-        assert result["challenge_detail"]["test_cases"] == []
+        # Generic fallback now includes function_call test cases
+        assert len(result["challenge_detail"]["test_cases"]) >= 2
+        assert "function_call" in result["challenge_detail"]["test_cases"][0]
 
     def test_starter_code_javascript(self):
         result = _fallback_challenge("arrays", "easy", "javascript")

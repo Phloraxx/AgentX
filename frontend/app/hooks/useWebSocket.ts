@@ -40,9 +40,15 @@ export function useWebSocket({
   onMessageRef.current = onMessage;
 
   useEffect(() => {
-    if (!sessionId) return;
-
+    // Don't connect until we have a real session ID — "new" is a placeholder
+    // that the backend will reject (404), burning the reconnect budget before
+    // the real ID arrives from POST /api/sessions.
+    if (!sessionId || sessionId === "new") {
+      setStatus("connecting");
+      return;
+    }
     let cancelled = false;
+
 
     function connect() {
       if (cancelled) return;
@@ -110,6 +116,8 @@ export function useWebSocket({
         wsRef.current = null;
       }
       setConnected(false);
+      // Reset reconnect budget so the next real sessionId gets a fresh attempt
+      reconnectCountRef.current = 0;
     };
   }, [sessionId]);
 

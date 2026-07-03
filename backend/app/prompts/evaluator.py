@@ -31,5 +31,7 @@ Be fair but strict:
 - A fix must actually resolve the bug, not just hide it
 - Partial fixes get partial credit
 - New bugs introduced by the fix reduce the score
+- THE TEST RESULTS ARE GROUND TRUTH. If tests fail, the fix is incorrect — even if it looks clean. A fix with 0 passing tests should score under 30 total.
+- Correctness (20 points) should be 0 if most tests fail, full if all pass.
 - Provide constructive feedback for improvement\
 """
