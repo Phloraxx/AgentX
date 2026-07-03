@@ -56,7 +56,8 @@ def _make_session_info_table(state: dict, styles) -> Any:
     language = state.get("language", "N/A")
     topic = state.get("topic", "N/A")
     difficulty = state.get("difficulty", "N/A")
-    round_num = state.get("round_num", 0)
+    rounds = state.get("rounds", [])
+    rounds_completed = len(rounds)
     max_rounds = state.get("max_rounds", 0)
     created_at = state.get("created_at", "N/A")
 
@@ -65,7 +66,7 @@ def _make_session_info_table(state: dict, styles) -> Any:
         ["Language", language],
         ["Topic", topic],
         ["Difficulty", difficulty],
-        ["Rounds Completed", f"{round_num} / {max_rounds}"],
+        ["Rounds Completed", f"{rounds_completed} / {max_rounds}"],
         ["Created", str(created_at)],
     ]
 
@@ -84,24 +85,23 @@ def _make_session_info_table(state: dict, styles) -> Any:
 
 
 def _make_round_table(rounds: list[dict], styles) -> Any:
-    """Build a per-round scores table."""
-    header = ["Round", "Bugs Fixed", "Code Quality", "Speed Bonus", "Total"]
+    header = ["Round", "Write Phase", "Fix Phase", "Bugs Fixed", "Total"]
     rows = [header]
 
     for r in rounds:
         score = r.get("score")
         if not score:
-            rows.append([str(r.get("round_num", "?")), "-", "-", "-", "-"])
+            rows.append([str(r.get("round_num", "?")), "-", "-", "-", "-", "-"])
             continue
         rows.append([
             str(r.get("round_num", "?")),
+            f"{score.get('write_score', 0)} / 40",
+            f"{score.get('fix_score', 0)} / 60",
             f"{score.get('bugs_fixed', 0)} / {score.get('bugs_total', 0)}",
-            f"{score.get('code_quality', 0):.0%}",
-            f"{score.get('speed_bonus', 0):.1f}",
             str(score.get("total", 0)),
         ])
 
-    table = Table(rows, colWidths=[0.8 * inch, 1.2 * inch, 1.2 * inch, 1.2 * inch, 1 * inch])
+    table = Table(rows, colWidths=[0.8 * inch, 1.1 * inch, 1.1 * inch, 1.2 * inch, 0.8 * inch])
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a1a2e")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
