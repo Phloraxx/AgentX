@@ -99,17 +99,17 @@ export function HomePage({ onStart }: HomePageProps) {
   const [difficulty, setDifficulty] = useState<string>("easy");
 
   return (
-    <div className="mx-auto flex max-w-[640px] flex-col items-stretch gap-14 pt-16 pb-20">
+    <div className="mx-auto flex max-w-[640px] flex-col items-stretch gap-10 pt-10 pb-16 sm:gap-14 sm:pt-16 sm:pb-20">
       {/* Headline — typographic, no gradient text, no metric template */}
       <div className="flex flex-col gap-4">
-        <h1 className="text-[2.5rem] font-semibold leading-[1.08] tracking-[-0.025em]">
+        <h1 className="font-semibold leading-[1.08] tracking-[-0.025em] text-[clamp(1.75rem,5vw,2.5rem)]">
           Write code.
           <br />
           An AI sabotages it.
           <br />
           <span className="text-[var(--color-primary)]">You fix it.</span>
         </h1>
-        <p className="max-w-[48ch] text-[15px] leading-relaxed text-[var(--color-ink-soft)]">
+        <p className="max-w-[48ch] text-[15px] leading-relaxed text-[var(--color-ink-soft)] text-wrap-pretty">
           A debugging trainer with a real feedback loop. Three agents run the
           round — Host sets the problem, Saboteur injects bugs into your
           solution, Evaluator scores the fix. Repeat until the skill is

@@ -102,14 +102,15 @@ export function CodeEditor({
 
   const isReadOnly = readOnly || !PHASE_EDITABLE[phase];
 
-  let code = storeOriginalCode || "// write your solution…";
-  if (phase === "setup") code = "// awaiting challenge…";
+  const comment = language === "javascript" ? "//" : "#";
+  let code = storeOriginalCode || `${comment} write your solution…`;
+  if (phase === "setup") code = `${comment} awaiting challenge…`;
   else if (phase === "student_writing")
-    code = storeOriginalCode || "# write your solution…";
+    code = storeOriginalCode || `${comment} write your solution…`;
   else if (["sabotage", "executing_original", "executing_buggy"].includes(phase))
-    code = buggyCode || storeOriginalCode || "// saboteur at work…";
+    code = buggyCode || storeOriginalCode || `${comment} saboteur at work…`;
   else if (phase === "student_fixing")
-    code = fixCode || buggyCode || storeOriginalCode || "// fix the bugs…";
+    code = fixCode || buggyCode || storeOriginalCode || `${comment} fix the bugs…`;
   else if (["executing_fix", "evaluating", "round_complete", "done"].includes(phase))
     code = fixCode || buggyCode || storeOriginalCode || "";
 

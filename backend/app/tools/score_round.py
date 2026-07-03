@@ -112,6 +112,7 @@ Respond with ONLY valid JSON (no markdown, no explanation)."""
                 "bugs_fixed": parsed.get("bugs_fixed", 0),
                 "bugs_total": parsed.get("bugs_total", len(bug_manifest)),
                 "code_quality": parsed.get("code_quality", 0.0),
+                "correctness": parsed.get("correctness", 0.0),
                 "speed_bonus": parsed.get("speed_bonus", 0.0),
                 "total": parsed.get("total", 0),
             },

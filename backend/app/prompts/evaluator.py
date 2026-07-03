@@ -20,6 +20,7 @@ Output JSON format:
   "bugs_fixed": <number of bugs correctly fixed>,
   "bugs_total": <total bugs that were injected>,
   "code_quality": <0.0 to 1.0>,
+  "correctness": <0.0 to 1.0>,
   "speed_bonus": <0.0 to 1.0>,
   "total": <0 to 100>,
   "feedback": "<detailed feedback for the student>",

@@ -4,6 +4,7 @@ import { useEffect, useCallback, useRef } from "react";
 import { useSessionStore } from "../stores/session";
 import { useWebSocket, type WsStatus } from "../hooks/useWebSocket";
 import { createSession, submitFix as submitFixFn, submitOriginalCode } from "../lib/api";
+import { ChallengeRenderer } from "../components/ChallengeRenderer";
 import { CodeEditor } from "../components/CodeEditor";
 import { TracePanel } from "../components/TracePanel";
 import { ChatPanel } from "../components/ChatPanel";
@@ -299,7 +300,13 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        {error && (
+          <span className="text-[12px] text-[var(--color-system)] lg:hidden">
+            {error.length > 40 ? error.slice(0, 40) + "…" : error}
+          </span>
+        )}
+
+        <div className="hidden items-center gap-3 lg:flex">
           {error && (
             <span className="text-[12px] text-[var(--color-system)]">{error}</span>
           )}
@@ -324,15 +331,12 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
         </div>
       </div>
 
-      {/* Challenge — typographic block, not a boxed card */}
       {challenge && (
-        <div className="max-w-[78ch] border-l-2 border-[var(--color-primary-line)] py-1 pl-4">
-          <div className="mb-1 text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--color-muted)]">
+        <div className="max-w-[78ch] rounded-md border border-[var(--color-hair)] bg-[var(--color-surface)] px-4 py-3">
+          <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--color-muted)]">
             Challenge
           </div>
-          <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-[var(--color-ink-soft)]">
-            {challenge}
-          </pre>
+          <ChallengeRenderer content={challenge} />
         </div>
       )}
 
@@ -370,6 +374,19 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
           </Panel>
         </div>
       </div>
+
+      {/* Mobile sticky submit bar — visible only below lg */}
+      {(phase === "student_writing" || phase === "student_fixing") && (
+        <div className="sticky bottom-0 z-10 flex items-center justify-end border-t border-[var(--color-hair)] bg-[var(--color-bg)]/90 px-4 py-3 backdrop-blur-md lg:hidden">
+          <button
+            onClick={phase === "student_writing" ? submitOriginal : submitFix}
+            disabled={loading || (phase === "student_writing" ? !originalCode.trim() : !fixCode.trim())}
+            className="w-full rounded-md bg-[var(--color-primary)] px-4 py-2.5 text-[13px] font-semibold text-[var(--color-bg)] transition-colors hover:bg-[var(--color-primary-strong)] disabled:opacity-40"
+          >
+            {loading ? "Running…" : phase === "student_writing" ? "Submit code" : "Submit fix"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

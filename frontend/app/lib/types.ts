@@ -20,6 +20,7 @@ export interface RoundScore {
   bugs_fixed: number;
   bugs_total: number;
   code_quality: number;
+  correctness: number;
   speed_bonus: number;
   total: number;
 }

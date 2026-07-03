@@ -24,6 +24,7 @@ class RoundScore(TypedDict):
     bugs_fixed: int
     bugs_total: int
     code_quality: float  # 0-1
+    correctness: float   # 0-1
     speed_bonus: float
     total: int  # 0-100
 

@@ -37,13 +37,7 @@ function ScoreCard({ score }: { score: RoundScore }) {
     },
     {
       label: "Correctness",
-      points: Math.max(
-        0,
-        score.total -
-          Math.round((score.bugs_fixed / Math.max(score.bugs_total, 1)) * 40) -
-          Math.round(score.code_quality * 30) -
-          Math.round(score.speed_bonus * 10),
-      ),
+      points: Math.round(score.correctness * 20),
       max: 20,
       css: "var(--color-evaluator)",
     },
