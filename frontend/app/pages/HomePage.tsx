@@ -133,7 +133,7 @@ export function HomePage({ onStart }: HomePageProps) {
             Start training
           </button>
           <span className="text-[13px] text-[var(--color-muted)]">
-            3 rounds · scored per round
+            1 round · scored
           </span>
         </div>
       </div>

@@ -38,7 +38,7 @@ class SessionCreate(BaseModel):
     language: str = "python"
     topic: str = "arrays"
     difficulty: str = "easy"
-    max_rounds: int = 3
+    max_rounds: int = 1
 
 
 class FixSubmit(BaseModel):

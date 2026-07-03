@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     evaluator_max_tokens: int = 1500
 
     # --- Demo ---
-    max_rounds: int = 3
+    max_rounds: int = 1
     max_bugs_per_difficulty: dict[str, int] = {
         "easy": 1,
         "medium": 2,

@@ -6,7 +6,7 @@ import { useWebSocket, type WsStatus } from "../hooks/useWebSocket";
 import { createSession, submitFix as submitFixFn, submitOriginalCode } from "../lib/api";
 import { ChallengeRenderer } from "../components/ChallengeRenderer";
 import { CodeEditor } from "../components/CodeEditor";
-import { TracePanel } from "../components/TracePanel";
+import { TraceToasts } from "../components/TraceToasts";
 import { ChatPanel } from "../components/ChatPanel";
 import { ScoreDisplay } from "../components/ScoreDisplay";
 import type {
@@ -24,12 +24,28 @@ interface SessionPageProps {
   onBack: () => void;
   config: SessionConfig;
 }
-
 const PHASE_COPY: Partial<Record<RoundPhase, string>> = {
-  executing_original: "Running your solution",
+  setup: "Fetching challenge from the web",
+  executing_original: "Running your solution in sandbox",
   executing_buggy: "Running sabotaged code",
-  executing_fix: "Running your fix",
+  executing_fix: "Running your fix in sandbox",
   evaluating: "Evaluator scoring the round",
+  sabotage: "Saboteur analyzing your code",
+  round_complete: "Scoring complete",
+  done: "Session complete",
+};
+
+const TRACE_STATUS: Record<string, string> = {
+  fetch_challenge: "Fetching challenge from the web",
+  present_challenge: "Preparing challenge",
+  awaiting_student_code: "Waiting for your code",
+  inject_bugs: "Saboteur injecting bugs into your code",
+  validate_original: "Testing your solution against hidden tests",
+  execute_code: "Running code in sandbox",
+  run_tests: "Running tests",
+  score_round: "Evaluator scoring your fix",
+  adjust_difficulty: "Computing final score",
+  finish: "Finishing round",
 };
 
 function humanizeError(raw: string): string {
@@ -68,6 +84,7 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
   const setError = useSessionStore((s) => s.setError);
   const fixCode = useSessionStore((s) => s.fixCode);
   const originalCode = useSessionStore((s) => s.originalCode);
+  const trace = useSessionStore((s) => s.trace);
 
   // Stable ref so startSession never needs config in its dep array
   const configRef = useRef(config);
@@ -113,7 +130,7 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
         language: cfg.language,
         topic: cfg.topic,
         difficulty: cfg.difficulty,
-        max_rounds: 3,
+        max_rounds: 1,
       };
       const res = await createSession(req);
       init({
@@ -269,6 +286,15 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
   }
 
   // ── Main session surface ───────────────────────────────────
+
+  // Derive live status text from the latest trace event
+  const latestTrace = trace.length > 0 ? trace[trace.length - 1] : null;
+  const liveStatus = isLoadingPhase
+    ? (latestTrace?.tool && TRACE_STATUS[latestTrace.tool]) ||
+      PHASE_COPY[phase] ||
+      "Working…"
+    : null;
+
   return (
     <div className="flex min-h-[calc(100vh-3.5rem-2.5rem)] flex-col gap-3 lg:h-[calc(100vh-3.5rem-2.5rem)]">
       {/* Status strip */}
@@ -286,9 +312,6 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
           </span>
           <span className="rounded border border-[var(--color-hair)] px-1.5 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-[var(--color-muted)]">
             {difficulty}
-          </span>
-          <span className="tnum text-[12px] text-[var(--color-ink-soft)]">
-            Round {(roundNum ?? 0) + 1}/3
           </span>
           <span className="flex items-center gap-1.5 text-[11px]">
             <span
@@ -331,6 +354,7 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
         </div>
       </div>
 
+      {/* Challenge — capped height, scrollable */}
       {challenge && (
         <div className="max-h-[200px] max-w-[78ch] overflow-y-auto rounded-md border border-[var(--color-hair)] bg-[var(--color-surface)] px-4 py-3">
           <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--color-muted)]">
@@ -340,8 +364,9 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
         </div>
       )}
 
-      {/* Editor + side rail — takes all remaining vertical space */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
+      {/* Editor (left) + Chat (right) — chat gets the full side rail */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:overflow-hidden">
+        {/* Editor */}
         <div className="relative flex min-h-[300px] flex-col overflow-hidden rounded-md border border-[var(--color-hair)] bg-[var(--color-surface)] lg:min-h-0">
           <CodeEditor
             language={config.language}
@@ -355,23 +380,24 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
                   style={{ animationDuration: "0.7s" }}
                 />
                 <span className="text-[12px] text-[var(--color-ink-soft)]">
-                  {PHASE_COPY[phase] ?? "Working…"}
+                  {liveStatus}
                 </span>
               </div>
             </div>
           )}
         </div>
 
+        {/* Chat panel — full height of side rail */}
         <div className="flex min-h-0 flex-col gap-3 lg:overflow-hidden">
           <ScoreDisplay />
-          <Panel title="Trace" grow>
-            <TracePanel />
-          </Panel>
-          <Panel title="Chat" grow>
+          <Panel title="Agent chat" grow>
             <ChatPanel />
           </Panel>
         </div>
       </div>
+
+      {/* Trace toasts — fixed bottom-right, auto-dismissing */}
+      <TraceToasts />
 
       {/* Mobile sticky submit bar — visible only below lg */}
       {(phase === "student_writing" || phase === "student_fixing") && (
