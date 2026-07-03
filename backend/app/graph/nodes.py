@@ -256,6 +256,20 @@ def saboteur_inject(state: SessionState) -> dict:
                                      "bug_types": [b.get("type") for b in bugs]},
                                     session_id=session_id)
 
+            # Host commentary: brief code review + acknowledge sabotage
+            host_review = _host_code_review(original_code, language)
+            chat_msgs = [
+                {"role": "host",
+                 "content": host_review,
+                 "ts": datetime.now(timezone.utc).isoformat()},
+                {"role": "saboteur",
+                 "content": f"🪲 Injected {len(bugs)} bug(s). Try to find and fix them!",
+                 "ts": datetime.now(timezone.utc).isoformat()},
+                {"role": "host",
+                 "content": f"Bugs are in. You've got this — read the code carefully, the issues are subtle. Submit your fix when you're ready.",
+                 "ts": datetime.now(timezone.utc).isoformat()},
+            ]
+
             return {
                 "phase": "student_fixing",
                 "current_round": {
@@ -266,9 +280,7 @@ def saboteur_inject(state: SessionState) -> dict:
                     "original_exec": result.get("original_exec"),
                     "buggy_exec": result.get("buggy_exec"),
                 },
-                "chat": [{"role": "saboteur",
-                          "content": f"🪲 Injected {len(bugs)} bug(s). Try to find and fix them!",
-                          "ts": datetime.now(timezone.utc).isoformat()}],
+                "chat": chat_msgs,
                 "trace": [trace],
             }
 
@@ -369,6 +381,12 @@ def host_run_fix(state: SessionState) -> dict:
                                  "duration_ms": fix_exec["duration_ms"]},
                                 session_id=session_id)
 
+        fix_ran_clean = fix_exec["exit_code"] == 0
+        host_wrap = (
+            "Your fix ran. Let's see how the Evaluator judges it."
+            if fix_ran_clean
+            else "Your fix threw an error — the Evaluator will take that into account."
+        )
         return {
             "phase": "evaluating",
             "current_round": {
@@ -377,6 +395,8 @@ def host_run_fix(state: SessionState) -> dict:
                 "original_exec": original_exec or state["current_round"].get("original_exec"),
                 "buggy_exec": buggy_exec or state["current_round"].get("buggy_exec"),
             },
+            "chat": [{"role": "host", "content": host_wrap,
+                      "ts": datetime.now(timezone.utc).isoformat()}],
             "trace": [trace],
         }
 
@@ -568,6 +588,41 @@ def adjust(state: SessionState) -> dict:
                                   {"ok": True, "difficulty": difficulty},
                                   session_id=state.get("session_id", ""))],
     }
+
+
+# --- Host code review helper ---
+
+
+def _host_code_review(code: str, language: str) -> str:
+    """Generate a brief Host reaction to the student's submitted code.
+
+    Uses the Host LLM with a short prompt to give a one-sentence reaction
+    (not a full review — just personality). Falls back to a generic message
+    if the LLM call fails.
+    """
+    from app.agents.base import make_llm
+    from langchain_core.messages import SystemMessage, HumanMessage
+
+    try:
+        llm = make_llm("host", temperature=0.6, max_tokens=200)
+        messages = [
+            SystemMessage(content=(
+                "You are the Host in AgentX. The student just submitted their solution. "
+                "Give a ONE-SENTENCE reaction to their code — a quick observation about "
+                "approach, style, or a potential edge case. Be encouraging but honest. "
+                "Do NOT give away the solution or mention bugs. Keep it under 20 words."
+            )),
+            HumanMessage(content=f"```{language}\n{code}\n```\n\nYour one-sentence reaction:"),
+        ]
+        response = llm.invoke(messages)
+        review = response.content.strip()
+        # Strip markdown that the LLM might add
+        if review.startswith('"') and review.endswith('"'):
+            review = review[1:-1]
+        return f"📝 {review}"
+    except Exception as e:
+        logger.warning(f"Host code review failed: {e}")
+        return "📝 Nice — let's see how the Saboteur handles it."
 
 
 # --- Helper functions ---
