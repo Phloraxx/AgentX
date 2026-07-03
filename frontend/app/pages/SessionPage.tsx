@@ -270,7 +270,7 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
 
   // ── Main session surface ───────────────────────────────────
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem-3rem)] flex-col gap-4 lg:h-[calc(100vh-3.5rem-3rem)]">
+    <div className="flex min-h-[calc(100vh-3.5rem-2.5rem)] flex-col gap-3 lg:h-[calc(100vh-3.5rem-2.5rem)]">
       {/* Status strip */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -332,7 +332,7 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
       </div>
 
       {challenge && (
-        <div className="max-w-[78ch] rounded-md border border-[var(--color-hair)] bg-[var(--color-surface)] px-4 py-3">
+        <div className="max-h-[200px] max-w-[78ch] overflow-y-auto rounded-md border border-[var(--color-hair)] bg-[var(--color-surface)] px-4 py-3">
           <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--color-muted)]">
             Challenge
           </div>
@@ -340,9 +340,9 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
         </div>
       )}
 
-      {/* Editor + side rail */}
-      <div className="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:overflow-hidden">
-        <div className="relative flex min-h-[420px] flex-col overflow-hidden rounded-md border border-[var(--color-hair)] bg-[var(--color-surface)] lg:min-h-0">
+      {/* Editor + side rail — takes all remaining vertical space */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
+        <div className="relative flex min-h-[300px] flex-col overflow-hidden rounded-md border border-[var(--color-hair)] bg-[var(--color-surface)] lg:min-h-0">
           <CodeEditor
             language={config.language}
             readOnly={phase !== "student_writing" && phase !== "student_fixing"}
@@ -362,13 +362,11 @@ export function SessionPage({ sessionId, onBack, config }: SessionPageProps) {
           )}
         </div>
 
-        <div className="flex flex-col gap-4 lg:overflow-hidden">
+        <div className="flex min-h-0 flex-col gap-3 lg:overflow-hidden">
           <ScoreDisplay />
-
           <Panel title="Trace" grow>
             <TracePanel />
           </Panel>
-
           <Panel title="Chat" grow>
             <ChatPanel />
           </Panel>

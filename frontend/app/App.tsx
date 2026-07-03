@@ -33,7 +33,7 @@ export function App() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--color-bg)] text-[var(--color-ink)]">
       <header className="sticky top-0 z-20 border-b border-[var(--color-hair)] bg-[var(--color-bg)]/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between px-6">
+        <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-6">
           <button
             onClick={goHome}
             className="group flex items-baseline gap-2.5"
@@ -77,7 +77,7 @@ export function App() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 py-6">
+      <main className="mx-auto w-full max-w-[1280px] flex-1 px-6 py-5">
         {page === "home" && <HomePage onStart={startSession} />}
         {page === "session" && sessionId && (
           <SessionPage
