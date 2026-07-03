@@ -502,7 +502,7 @@ def evaluator_score(state: SessionState) -> dict:
                 **current,
                 "score": {
                     "bugs_fixed": 0, "bugs_total": len(bugs),
-                    "code_quality": 0.0, "speed_bonus": 0.0, "total": 0,
+                    "code_quality": 0.0, "correctness": 0.0, "speed_bonus": 0.0, "total": 0,
                 },
             },
             "chat": [{'role': 'system',
@@ -522,16 +522,17 @@ def evaluator_score(state: SessionState) -> dict:
                 **current,
                 "score": {
                     "bugs_fixed": 0, "bugs_total": len(bugs),
-                    "code_quality": 0.0, "speed_bonus": 0.0, "total": 0,
+                    "code_quality": 0.0, "correctness": 0.0, "speed_bonus": 0.0, "total": 0,
                 },
             },
             "chat": [{'role': 'system',
                       'content': 'Warning: Evaluator failed to score; round scored 0.',
                       'ts': datetime.now(timezone.utc).isoformat()}],
             "trace": traces + [_trace_and_emit("evaluating", "evaluator", "score_round",
-                                               {}, {"ok": False, "error": str(e)},
+                                               {}, {"ok": False, "error": score_result.get("error", "unknown")},
                                                session_id=session_id)],
         }
+
 
 
 def adjust(state: SessionState) -> dict:
