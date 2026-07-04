@@ -336,7 +336,59 @@ def saboteur_inject(state: SessionState) -> dict:
                 "trace": traces,
             }
 
-        # Tool returned error — surface failure
+        # Saboteur LLM failed — inject a simple fallback bug so the round
+        # can continue. We pick a line and modify it simply (e.g. flip
+        # a comparison, change a constant). This guarantees the student
+        # always gets to debug something, even if the LLM hallucinated.
+        from app.utils import apply_bugs, validate_compiles
+        fallback_bug = _generate_fallback_bug(original_code, language)
+        if fallback_bug:
+            bugs = [fallback_bug["manifest"]]
+            buggy_code = fallback_bug["code"]
+            saboteur_tests = []
+            existing_tests = state.get("current_round", {}).get("test_cases", [])
+            test_cases = existing_tests
+
+            trace = _trace_and_emit("sabotage", "saboteur", "inject_bugs",
+                                    {"difficulty": difficulty, "language": language},
+                                    {"ok": True, "bugs_count": 1, "bug_types": ["logic"],
+                                     "fallback": True},
+                                    session_id=session_id)
+
+            host_review = _host_code_review(original_code, language)
+            chat_msgs = [
+                *write_chat_msgs,
+                {"role": "host", "content": host_review,
+                 "ts": datetime.now(timezone.utc).isoformat()},
+                {"role": "saboteur",
+                 "content": f"🪲 Injected 1 bug(s). Try to find and fix them!",
+                 "ts": datetime.now(timezone.utc).isoformat()},
+                {"role": "host",
+                 "content": "Bugs are in. You've got this — read the code carefully, the issues are subtle. Submit your fix when you're ready.",
+                 "ts": datetime.now(timezone.utc).isoformat()},
+            ]
+
+            from app.sandbox.manager import get_sandbox
+            sandbox = get_sandbox()
+            original_exec = sandbox.run(original_code, language)
+            buggy_exec = sandbox.run(buggy_code, language)
+
+            traces = [t for t in [write_trace, trace] if t is not None]
+            return {
+                "phase": "student_fixing",
+                "current_round": {
+                    **state["current_round"],
+                    "buggy_code": buggy_code,
+                    "bug_manifest": bugs,
+                    "test_cases": test_cases,
+                    "original_exec": original_exec,
+                    "buggy_exec": buggy_exec,
+                },
+                "chat": chat_msgs,
+                "trace": traces,
+            }
+
+        # Even fallback failed — surface error to student
         return {
             "phase": "student_writing",
             "current_round": {**state["current_round"], "buggy_code": "", "bug_manifest": [], "test_cases": []},
@@ -664,6 +716,52 @@ def adjust(state: SessionState) -> dict:
                                   {"ok": True, "difficulty": difficulty},
                                   session_id=state.get("session_id", ""))],
     }
+
+
+def _generate_fallback_bug(code: str, language: str) -> dict | None:
+    """Generate a simple fallback bug when the saboteur LLM fails.
+
+    Tries simple mutations (flip comparison operators, change constants)
+    until one produces code that still compiles. Returns the buggy code
+    and a bug manifest entry, or None if no mutation works.
+    """
+    from app.utils import validate_compiles
+    import re
+
+    lines = code.split("\n")
+    # Mutations to try, in priority order
+    mutations = [
+        ("==", "!="), ("!=", "=="),
+        ("<", ">"), (">", "<"),
+        ("<=", ">="), (">=", "<="),
+        ("+ ", "- "), ("- ", "+ "),
+        (" and ", " or "), (" or ", " and "),
+        ("return True", "return False"),
+        ("return False", "return True"),
+        ("[::-1]", "[::1]"),
+        ("reversed(", "sorted("),
+    ]
+
+    for i, line in enumerate(lines):
+        for original, replacement in mutations:
+            if original in line:
+                new_line = line.replace(original, replacement, 1)
+                new_lines = lines.copy()
+                new_lines[i] = new_line
+                buggy = "\n".join(new_lines)
+                if validate_compiles(buggy, language):
+                    return {
+                        "code": buggy,
+                        "manifest": {
+                            "line": i + 1,
+                            "type": "logic",
+                            "description": f"Changed '{original.strip()}' to '{replacement.strip()}' on line {i+1}",
+                            "original": line.strip(),
+                            "sabotaged": new_line.strip(),
+                        },
+                    }
+
+    return None
 
 
 # --- Host code review helper ---
