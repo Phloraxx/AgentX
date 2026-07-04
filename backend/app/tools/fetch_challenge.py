@@ -119,6 +119,7 @@ def _llm_parse_challenge(
         '(e.g. "two_sum([2,7,11,15], 9)").\n'
         '- expected must be the correct return value as JSON (e.g. "[0,1]", "3", "true").\n'
         "- starter_code must include a function signature matching the test_calls.\n"
+        f"- The solution must be solvable using ONLY {language}'s standard library — no external packages like numpy, pandas, etc.\n"
         '- If no real problem exists in the text, return {"error": "no problem found"}.'
     )
 
